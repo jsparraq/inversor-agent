@@ -5,7 +5,8 @@ import sys
 from datetime import datetime, date
 from pathlib import Path
 
-URL_LOGIN = "https://sso.teachable.com/secure/1229078/identity/login/password?force=true"
+URL_LOGIN   = "https://sso.teachable.com/secure/1229078/identity/login/password?force=true"
+URL_LOGOUT  = "https://sso.teachable.com/secure/1229078/users/sign_out"
 
 MESES_ES = {
     "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
@@ -70,10 +71,26 @@ def hacer_login(page, email, password):
     print(f"[2/3] Credenciales ingresadas: {email}")
 
     page.locator("input#password").fill(password)
-
     page.locator("input[data-testid='login-button']").click()
 
-    page.wait_for_load_state("networkidle", timeout=30000)
+    # Esperar a que la URL cambie fuera de la página de login (redirección exitosa).
+    # Si en 30 s la URL sigue siendo la de login, el scraper se detiene con error claro.
+    try:
+        page.wait_for_url(
+            lambda url: "login" not in url.lower(),
+            timeout=30000,
+        )
+    except Exception:
+        # Último intento: esperar networkidle y volver a revisar la URL
+        page.wait_for_load_state("networkidle", timeout=10000)
+
+    if "login" in page.url.lower():
+        print(
+            f"  [ERROR] Login fallido — la URL sigue siendo la de login: {page.url}\n"
+            "  Verifica credenciales o si Teachable está bloqueando el acceso."
+        )
+        sys.exit(1)
+
     print(f"[3/3] Login exitoso. URL: {page.url}\n")
 
 
@@ -230,36 +247,36 @@ def generar_markdown(top_empresas, todas, fecha_corte):
 
     def seccion(i, emp):
         neg = (
-            f"  - Negativo:   ${emp['escenario_negativo']} USD  — CAGR {emp['cagr_negativo']}%"
+            f"  - Bear case:   ${emp['escenario_negativo']} USD  — CAGR {emp['cagr_negativo']}%"
             if emp["escenario_negativo"]
-            else "  - Negativo:   no disponible"
+            else "  - Bear case:   not available"
         )
         base = (
-            f"  - Base:        ${emp['escenario_base']} USD  — CAGR {emp['cagr_base']}%"
+            f"  - Base case:   ${emp['escenario_base']} USD  — CAGR {emp['cagr_base']}%"
             if emp["escenario_base"]
-            else "  - Base:        no disponible"
+            else "  - Base case:   not available"
         )
         opt = (
-            f"  - Optimista:  ${emp['escenario_optimista']} USD  — CAGR {emp['cagr_optimista']}%"
+            f"  - Bull case:   ${emp['escenario_optimista']} USD  — CAGR {emp['cagr_optimista']}%"
             if emp["escenario_optimista"]
-            else "  - Optimista:  no disponible"
+            else "  - Bull case:   not available"
         )
-        val    = f"  - Value:               {emp['value']}"          if emp["value"]               else "  - Value:               no disponible"
-        dval   = f"  - Deep Value:          {emp['deep_value']}"       if emp["deep_value"]          else "  - Deep Value:          no disponible"
-        vhist  = f"  - Valoración histórica: {emp['valoracion_historica']}" if emp["valoracion_historica"] else "  - Valoración histórica: no disponible"
+        val    = f"  - Value:                {emp['value']}"               if emp["value"]               else "  - Value:                not available"
+        dval   = f"  - Deep Value:           {emp['deep_value']}"           if emp["deep_value"]          else "  - Deep Value:           not available"
+        vhist  = f"  - Historical valuation: {emp['valoracion_historica']}" if emp["valoracion_historica"] else "  - Historical valuation: not available"
 
         return "\n".join(
             [
                 f"### {i}. {emp['nombre']}",
-                f"- **Ticker en bolsa:** `{emp['nombre']}`",
-                f"- **Fecha del estudio:** {emp['fecha']}",
-                f"- **Momento de inversión:** `{emp['momento']}`",
-                f"- **Score combinado:** {emp['score']}",
-                "- **Zonas de precio:**",
+                f"- **Stock ticker:** `{emp['nombre']}`",
+                f"- **Study date:** {emp['fecha']}",
+                f"- **Investment moment:** `{emp['momento']}`",
+                f"- **Composite score:** {emp['score']}",
+                "- **Price zones:**",
                 val,
                 dval,
                 vhist,
-                "- **Proyecciones:**",
+                "- **Projections:**",
                 neg,
                 base,
                 opt,
@@ -269,16 +286,16 @@ def generar_markdown(top_empresas, todas, fecha_corte):
         )
 
     lineas = [
-        "# Resumen — Mejores Oportunidades de Inversión",
+        "# Summary — Best Investment Opportunities",
         "",
-        f"**Generado:** {hoy}  ",
-        f"**Período analizado:** estudios desde {fecha_corte.strftime('%B %Y')}  ",
-        f"**Total empresas analizadas:** {len(todas)}  ",
-        "**Criterio de ranking:** CAGR base ×0.4 + CAGR optimista ×0.3 + Momento de inversión ×0.3",
+        f"**Generated:** {hoy}  ",
+        f"**Period analyzed:** studies from {fecha_corte.strftime('%B %Y')}  ",
+        f"**Total companies analyzed:** {len(todas)}  ",
+        "**Ranking criteria:** CAGR base ×0.4 + CAGR bull ×0.3 + Investment moment ×0.3",
         "",
         "---",
         "",
-        f"## Top {len(top_empresas)} Mejores Oportunidades",
+        f"## Top {len(top_empresas)} Best Opportunities",
         "",
     ]
 
@@ -288,10 +305,10 @@ def generar_markdown(top_empresas, todas, fecha_corte):
     lineas += [
         "---",
         "",
-        "## Tabla Completa",
+        "## Full Table",
         "",
-        "| Ticker | Fecha | CAGR Base | CAGR Opt. | Momento | Score |",
-        "|--------|-------|-----------|-----------|---------|-------|",
+        "| Ticker | Date | CAGR Base | CAGR Bull | Moment | Score |",
+        "|--------|------|-----------|-----------|--------|-------|",
     ]
     for emp in sorted(todas, key=lambda x: x["score"], reverse=True):
         lineas.append(fila(emp))
@@ -462,15 +479,30 @@ def step_guardar_reporte(resultados, top_n, fecha_corte):
     top_empresas = resultados[:top_n]
 
     print("\n" + "=" * 40)
-    print(f"TOP {top_n} EMPRESAS:")
+    print(f"TOP {top_n} COMPANIES:")
     for i, emp in enumerate(top_empresas, 1):
-        print(f"  {i}. {emp['nombre']:8} Score: {emp['score']}  Momento: {emp['momento']}")
+        print(f"  {i}. {emp['nombre']:8} Score: {emp['score']}  Moment: {emp['momento']}")
     print("=" * 40)
 
     markdown = generar_markdown(top_empresas, resultados, fecha_corte)
-    output = Path(f"resumen_inversiones_{datetime.now().strftime('%Y-%m-%d')}.md")
+    output = Path(f"./arenaalfa/reports/summary_invest_usa_{datetime.now().strftime('%Y-%m-%d')}.md")
     output.write_text(markdown, encoding="utf-8")
     print(f"\nArchivo guardado: {output.resolve()}")
+
+
+# ─────────────────────────────────────────
+# LOGOUT
+# ─────────────────────────────────────────
+
+def step_cerrar_sesion(page, debug_dir):
+    """Paso 7: Cierra sesión en Teachable SSO."""
+    print("\nCerrando sesión...")
+    try:
+        page.goto(URL_LOGOUT, wait_until="networkidle", timeout=15000)
+        guardar_debug(page, debug_dir, "07_logout")
+        print(f"  Sesión cerrada. URL: {page.url}")
+    except Exception as e:
+        print(f"  [WARN] No se pudo cerrar sesión automáticamente: {e}")
 
 
 # ─────────────────────────────────────────
@@ -526,6 +558,7 @@ def main():
         empresas = step_extraer_links(page, debug_dir, fecha_corte, args.meses)  # 4
         resultados = step_analizar_empresas(context, empresas, debug_dir)    # 5
         step_guardar_reporte(resultados, args.top, fecha_corte)              # 6
+        step_cerrar_sesion(page, debug_dir)                                  # 7
 
         input("\nPresiona ENTER para cerrar el navegador...")
         context.close()

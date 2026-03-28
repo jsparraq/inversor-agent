@@ -43,3 +43,11 @@ htmlcov/
 resumen_inversiones_*.md
 debug_html/
 debug_*.png
+arenaalfa/reports/*.md
+
+# Saved browser sessions (contain auth cookies — never commit)
+session.json
+**/session.json
+
+# HTML
+**/*.html
