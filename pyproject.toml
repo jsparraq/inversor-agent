@@ -1,0 +1,19 @@
+[project]
+name = "inversor-agent"
+version = "0.1.0"
+description = "The agent for inversions"
+authors = [
+    {name = "Juan Sebastian Parra Quintero",email = "sebastian.parra96@gmail.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.12"
+dependencies = [
+    "yfinance (>=1.2.0,<2.0.0)",
+    "playwright (>=1.58.0,<2.0.0)",
+    "chromium (>=0.0.0,<0.0.1)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
