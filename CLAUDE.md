@@ -89,6 +89,31 @@ generar_reporte → arenaalfa/reports/validation_YYYY-MM-DD.md
 5. **Valuation logic** — USA: price zone (Historical / Deep Value / Value / Above Value) + implied 5-year CAGR vs original → BUY / WATCH / NOT ATTRACTIVE. Colombia: Arena Alfa rating (undervalued → BUY, neutral → WATCH, over/extremely over → NOT ATTRACTIVE).
 6. **`generar_reporte`** — Writes unified `validation_YYYY-MM-DD.md` with BUY (detailed), WATCH (detailed), and NOT ATTRACTIVE (compact table) sections.
 
+### Skills
+
+| Skill | Trigger | Description |
+|-------|---------|-------------|
+| `/stock-analysis` | `.claude/commands/stock-analysis.md` | Deep analysis of BUY stocks from the latest validation report. Fetches current news, confirms price zones, checks superinvestor holdings, and generates a tiered priority report in `arenaalfa/reports/deep_analysis_YYYY-MM-DD.md` |
+| `/allocate [COP]` | `.claude/commands/allocate.md` | Generates a monthly capital allocation proposal for a given COP amount (e.g. `/allocate 2000000`). Reads the latest `deep_analysis_*.md`, weights only `MANTENER CONVICCION` stocks using tier + superinvestor signal + upside/CAGR, fetches current TRM (USD/COP), calculates exact whole shares for Colombia and fractional shares for USA, and saves `arenaalfa/reports/allocation_[amount]_[YYYY-MM-DD].md` |
+
+**Usage:** Type `/stock-analysis` in Claude Code. The skill auto-detects the latest `validation_*.md` report, analyzes every BUY stock using WebSearch/WebFetch, and produces a priority-tiered markdown report.
+
+**Pipeline (7 steps):**
+1. Load latest `validation_*.md` and extract all BUY stocks
+2. Fetch current macro context (Fed, Banrep, USD/COP, S&P 500, Colcap)
+3. Analyze each BUY stock — news, price confirmation, conviction check (`MANTENER CONVICCION` / `VIGILAR` / `REVISAR`)
+4. **Superinvestors check** — for every `MANTENER CONVICCION` stock, searches SEC 13F filings via Dataroma/GuruFocus to see if Warren Buffett, Bill Ackman, Michael Burry, David Einhorn, Seth Klarman, Mohnish Pabrai, Li Lu, Joel Greenblatt, Guy Spier, Howard Marks (or others) hold a position. Colombian stocks: checks BlackRock ICOLCAP ETF and AFP pension fund exposure. Classifies each as `VALIDADO` / `POSICIÓN MENOR` / `SIN POSICIÓN CONOCIDA` / `VENDIDO RECIENTEMENTE`.
+5. Group into priority tiers (superinvestor signal can promote a stock within its tier)
+6. Generate and save the report
+7. Print summary to user
+
+**Output structure:**
+- Tier 1: highest conviction + largest upside (boosted if `VALIDADO` by superinvestors)
+- Tier 2: good entry, moderate upside
+- Tier 3: watch / review (approaching target or mixed signals)
+- `## Señal de Superinversores` — summary table of all MANTENER CONVICCION stocks vs. known institutional holders
+- `## Resumen Ejecutivo` — full table with `Superinv.` column
+
 ### Debug output
 
 Every run saves HTML + screenshots to `debug_html/` (gitignored).

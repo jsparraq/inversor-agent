@@ -136,7 +136,7 @@ def parsear_reporte_usa(path: Path) -> tuple[date, list[dict]]:
         detallados[ticker] = {
             "ticker":      ticker,
             "study_date":  study_date_str,
-            "momento":     momento or "desconocido",
+            "momento":     momento or "unknown",
             "score":       float(score_str) if score_str else 0.0,
             "value":       parsear_rango(value_str),
             "deep_value":  parsear_rango(deep_value_str),
